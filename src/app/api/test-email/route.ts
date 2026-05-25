@@ -31,10 +31,20 @@ function mapAuditRowToResult(auditRow: AuditRow): AuditResult {
 
 export async function POST(request: NextRequest) {
   const configuredSecret = process.env.TEST_EMAIL_SECRET;
+  const hasSupabaseUrl = !!process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const hasServiceRoleKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!configuredSecret) {
     return NextResponse.json(
-      { success: false, error: "TEST_EMAIL_SECRET is not configured." },
+      {
+        success: false,
+        error: "TEST_EMAIL_SECRET is not configured.",
+        diagnostics: {
+          hasTestEmailSecret: !!configuredSecret,
+          hasSupabaseUrl,
+          hasServiceRoleKey,
+        },
+      },
       { status: 503 }
     );
   }
@@ -66,9 +76,17 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  if (!hasSupabaseUrl || !hasServiceRoleKey) {
     return NextResponse.json(
-      { success: false, error: "Supabase is not configured on the server." },
+      {
+        success: false,
+        error: "Supabase is not configured on the server.",
+        diagnostics: {
+          hasTestEmailSecret: !!configuredSecret,
+          hasSupabaseUrl,
+          hasServiceRoleKey,
+        },
+      },
       { status: 503 }
     );
   }
