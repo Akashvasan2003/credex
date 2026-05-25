@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getAuditBySlug } from "@/features/audit/actions";
+import { readEnv } from "@/lib/env";
 import ResultsPage from "@/features/results/ResultsPage";
 import { formatCurrency } from "@/utils/format";
 
@@ -10,6 +11,7 @@ interface Props {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const audit = await getAuditBySlug(slug);
+  const appUrl = readEnv("NEXT_PUBLIC_APP_URL") ?? "https://spendlens.ai";
 
   if (!audit) {
     return { title: "Audit Not Found" };
@@ -26,7 +28,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       description,
       images: [
         {
-          url: `${process.env.NEXT_PUBLIC_APP_URL}/api/og?slug=${slug}`,
+          url: `${appUrl}/api/og?slug=${slug}`,
           width: 1200,
           height: 630,
         },
@@ -36,7 +38,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       card: "summary_large_image",
       title,
       description,
-      images: [`${process.env.NEXT_PUBLIC_APP_URL}/api/og?slug=${slug}`],
+      images: [`${appUrl}/api/og?slug=${slug}`],
     },
   };
 }

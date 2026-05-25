@@ -1,12 +1,13 @@
 import { ImageResponse } from "next/og";
+import { readEnv } from "@/lib/env";
 
 export const runtime = "edge";
 
 async function getAuditData(slug: string): Promise<{ savings: string; annualSavings: string; toolCount: number } | null> {
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!supabaseUrl || !serviceKey || supabaseUrl.includes('placeholder')) return null;
+    const supabaseUrl = readEnv("NEXT_PUBLIC_SUPABASE_URL");
+    const serviceKey = readEnv("SUPABASE_SERVICE_ROLE_KEY");
+    if (!supabaseUrl || !serviceKey || supabaseUrl.includes("placeholder")) return null;
 
     const res = await fetch(
       `${supabaseUrl}/rest/v1/audits?share_slug=eq.${slug}&select=total_monthly_savings,total_annual_savings,recommendations`,

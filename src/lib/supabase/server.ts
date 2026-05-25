@@ -100,7 +100,9 @@ async function supabaseRequest<T>(
   }
 
   try {
-    const response = await fetch(`${config.supabaseUrl}/rest/v1/${path}`, {
+    const endpoint = new URL(`/rest/v1/${path}`, `${config.supabaseUrl}/`);
+
+    const response = await fetch(endpoint, {
       ...init,
       cache: "no-store",
       headers: buildHeaders(init?.headers),
@@ -121,7 +123,12 @@ async function supabaseRequest<T>(
     const data = text ? (JSON.parse(text) as T) : null;
     return { data, error: null, count };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown Supabase request failure.";
+    const message =
+      error instanceof Error
+        ? [error.message, error.cause instanceof Error ? error.cause.message : undefined]
+            .filter(Boolean)
+            .join(" | ")
+        : "Unknown Supabase request failure.";
     return { data: null, error: message };
   }
 }

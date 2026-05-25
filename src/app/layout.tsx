@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { readEnv } from "@/lib/env";
 import "./globals.css";
 
 const inter = Inter({
@@ -8,10 +9,12 @@ const inter = Inter({
   display: "swap",
 });
 
+const appUrl = readEnv("NEXT_PUBLIC_APP_URL") ?? "https://spendlens.ai";
+
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "https://spendlens.ai"),
+  metadataBase: new URL(appUrl),
   title: {
-    default: "SpendLens — AI Spend Audit for Startups",
+    default: "SpendLens - AI Spend Audit for Startups",
     template: "%s | SpendLens",
   },
   description:
@@ -21,13 +24,13 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: process.env.NEXT_PUBLIC_APP_URL,
+    url: appUrl,
     siteName: "SpendLens",
-    title: "SpendLens — AI Spend Audit for Startups",
+    title: "SpendLens - AI Spend Audit for Startups",
     description: "Find out how much you're overpaying for AI tools. Free audit in 3 minutes.",
     images: [
       {
-        url: `${process.env.NEXT_PUBLIC_APP_URL}/og-default.png`,
+        url: `${appUrl}/og-default.png`,
         width: 1200,
         height: 630,
         alt: "SpendLens AI Spend Audit",
@@ -36,9 +39,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "SpendLens — AI Spend Audit for Startups",
+    title: "SpendLens - AI Spend Audit for Startups",
     description: "Find out how much you're overpaying for AI tools. Free audit in 3 minutes.",
-    images: [`${process.env.NEXT_PUBLIC_APP_URL}/og-default.png`],
+    images: [`${appUrl}/og-default.png`],
   },
   robots: { index: true, follow: true },
 };
