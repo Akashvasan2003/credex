@@ -1,36 +1,87 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SpendLens — AI Spend Audit Platform
 
-## Getting Started
+> Audit your AI tool spending in 3 minutes. Get specific, defensible recommendations with real savings numbers.
 
-First, run the development server:
+**Built for the Credex AI Spend Audit assignment.**
+
+---
+
+## Screenshots
+
+> _[Screenshot placeholder: Landing page hero]_
+> _[Screenshot placeholder: Audit form with 3 tools]_
+> _[Screenshot placeholder: Results page showing $2,400/yr savings]_
+> _[Screenshot placeholder: Lead capture modal]_
+> _[Screenshot placeholder: Shared audit link]_
+
+---
+
+## Install & Run
 
 ```bash
+# 1. Clone
+git clone https://github.com/your-org/spendlens
+cd spendlens
+
+# 2. Install
+npm install
+
+# 3. Configure environment
+cp .env.example .env.local
+# Fill in NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, ANTHROPIC_API_KEY, RESEND_API_KEY
+
+# 4. Set up database
+# Run supabase/schema.sql in your Supabase SQL editor
+
+# 5. Run dev server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Deploy to Vercel
 
-## Learn More
+```bash
+npx vercel --prod
+```
 
-To learn more about Next.js, take a look at the following resources:
+Set environment variables in Vercel dashboard (same as .env.example).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Run Tests
 
-## Deploy on Vercel
+```bash
+npm run test
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 5 Key Tradeoff Decisions
+
+### 1. No login — email after value
+**Decision:** Capture email only after the audit is complete, not before.  
+**Tradeoff:** Lower lead quality (no pre-qualification) vs. higher conversion (users see value first).  
+**Why:** Cold visitors from HN/Twitter won't give email for a promise. They will after seeing $2,400/yr in savings.
+
+### 2. Hardcoded pricing engine, no AI for math
+**Decision:** All savings calculations use verified, typed pricing data. AI is only used for the narrative summary.  
+**Tradeoff:** Manual maintenance of pricing data vs. defensible, auditable numbers.  
+**Why:** A CFO needs to trust the numbers. "The AI said so" is not a valid citation. Verified pricing URLs are.
+
+### 3. LocalStorage for audit persistence, not server-side sessions
+**Decision:** Completed audits are stored in localStorage keyed by audit ID.  
+**Tradeoff:** Data lost on browser clear vs. zero auth complexity and instant UX.  
+**Why:** No-login product. Server-side sessions require auth. LocalStorage is sufficient for the "just completed" flow.
+
+### 4. Honeypot over CAPTCHA for bot protection
+**Decision:** Hidden honeypot field on lead capture form instead of reCAPTCHA.  
+**Tradeoff:** Less robust against sophisticated bots vs. zero UX friction for real users.  
+**Why:** reCAPTCHA adds 2-3 seconds of friction and accessibility issues. Honeypot catches 95%+ of automated form submissions with zero user impact. Rate limiting (3/hr per email) handles the rest.
+
+### 5. Edge runtime for OG image generation
+**Decision:** OG image API route uses Next.js Edge runtime with `ImageResponse`.  
+**Tradeoff:** Limited Node.js APIs vs. fast cold starts and global CDN distribution.  
+**Why:** OG images are fetched by social crawlers worldwide. Edge runtime ensures <100ms response globally without a warm Node.js instance.
