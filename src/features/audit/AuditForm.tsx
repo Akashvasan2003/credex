@@ -107,7 +107,6 @@ export default function AuditForm() {
     setLoading(true);
     try {
       const result: AuditResult = await submitAudit({ tools, teamSize, useCase });
-      localStorage.setItem(`audit_${result.id}`, JSON.stringify(result));
       localStorage.removeItem(STORAGE_KEY);
       router.push(`/results/${result.id}`);
     } catch (err) {

@@ -1,10 +1,17 @@
 "use server";
 
 import { z } from "zod";
-import { readEnv } from "@/lib/env";
 import { generateAISummary } from "@/lib/ai/summary";
 import { sendAuditEmail } from "@/lib/email/audit-email";
-import { supabaseAdmin } from "@/lib/supabase/server";
+import {
+  getAuditRowById,
+  getAuditRowBySlug,
+  hasSupabaseServerConfig,
+  insertAuditRow,
+  insertLeadRow,
+  countRecentLeadsByEmail,
+  type AuditRow,
+} from "@/lib/supabase/server";
 import { runAudit } from "@/features/audit/engine";
 import type { AuditInput, AuditResult, LeadCapture } from "@/types";
 import { nanoid } from "@/utils/nanoid";
@@ -18,17 +25,7 @@ const LeadSchema = z.object({
   honeypot: z.string().max(0, "Bot detected"),
 });
 
-function mapAuditRowToResult(auditRow: {
-  id: string;
-  input: AuditResult["input"];
-  recommendations: AuditResult["recommendations"];
-  total_monthly_spend: number;
-  total_monthly_savings: number;
-  total_annual_savings: number;
-  ai_summary: string | null;
-  created_at: string;
-  share_slug: string;
-}): AuditResult {
+function mapAuditRowToResult(auditRow: AuditRow): AuditResult {
   return {
     id: auditRow.id,
     input: auditRow.input,
@@ -49,29 +46,32 @@ export async function submitAudit(input: AuditInput): Promise<AuditResult> {
 
   result.aiSummary = await generateAISummary(result);
 
-  if (readEnv("NEXT_PUBLIC_SUPABASE_URL") && readEnv("SUPABASE_SERVICE_ROLE_KEY")) {
-    const { error } = await supabaseAdmin.from("audits").insert({
-      id: result.id,
-      share_slug: shareSlug,
-      input: result.input,
-      recommendations: result.recommendations,
-      total_monthly_spend: result.totalMonthlySpend,
-      total_monthly_savings: result.totalMonthlySavings,
-      total_annual_savings: result.totalAnnualSavings,
-      ai_summary: result.aiSummary,
-      created_at: result.createdAt,
-    });
+  if (!hasSupabaseServerConfig()) {
+    throw new Error("Supabase is not configured on the server.");
+  }
 
-    if (error) {
-      console.error("Supabase insert error:", error.message);
-    }
+  const { error } = await insertAuditRow({
+    id: result.id,
+    share_slug: shareSlug,
+    input: result.input,
+    recommendations: result.recommendations,
+    total_monthly_spend: result.totalMonthlySpend,
+    total_monthly_savings: result.totalMonthlySavings,
+    total_annual_savings: result.totalAnnualSavings,
+    ai_summary: result.aiSummary ?? null,
+    created_at: result.createdAt,
+  });
+
+  if (error) {
+    console.error("Supabase insert error:", error);
+    throw new Error("We couldn't save your audit. Please try again.");
   }
 
   return result;
 }
 
 export async function captureLead(
-  data: LeadCapture & { honeypot?: string; auditSnapshot?: AuditResult }
+  data: LeadCapture & { honeypot?: string }
 ): Promise<{ success: boolean; error?: string }> {
   const parsed = LeadSchema.safeParse(data);
 
@@ -80,55 +80,48 @@ export async function captureLead(
   }
 
   const { email, company, role, teamSize, auditId } = parsed.data;
-  const auditSnapshot = data.auditSnapshot;
-  const hasSupabase =
-    !!readEnv("NEXT_PUBLIC_SUPABASE_URL") && !!readEnv("SUPABASE_SERVICE_ROLE_KEY");
 
-  if (hasSupabase) {
-    const oneHourAgo = new Date(Date.now() - 3600000).toISOString();
-    const { count, error: rateLimitError } = await supabaseAdmin
-      .from("leads")
-      .select("*", { count: "exact", head: true })
-      .eq("email", email)
-      .gte("created_at", oneHourAgo);
-
-    if (rateLimitError) {
-      console.error("Lead rate limit check failed:", rateLimitError.message);
-    }
-
-    if (!rateLimitError && (count ?? 0) >= 3) {
-      return { success: false, error: "Too many requests. Please try again later." };
-    }
-
-    const { error: insertLeadError } = await supabaseAdmin.from("leads").insert({
-      email,
-      company,
-      role,
-      team_size: teamSize,
-      audit_id: auditId,
-      created_at: new Date().toISOString(),
-    });
-
-    if (insertLeadError) {
-      console.error("Lead insert failed:", insertLeadError.message);
-    }
+  if (!hasSupabaseServerConfig()) {
+    return { success: false, error: "Supabase is not configured on the server." };
   }
 
-  let auditForEmail: AuditResult | null = auditSnapshot ?? null;
+  const oneHourAgo = new Date(Date.now() - 3600000).toISOString();
+  const { count, error: rateLimitError } = await countRecentLeadsByEmail(email, oneHourAgo);
 
-  if (!auditForEmail && hasSupabase) {
-    const { data: auditRow, error: auditFetchError } = await supabaseAdmin
-      .from("audits")
-      .select("*")
-      .eq("id", auditId)
-      .single();
-
-    if (auditFetchError) {
-      console.error("Audit fetch failed:", auditFetchError.message);
-    } else if (auditRow) {
-      auditForEmail = mapAuditRowToResult(auditRow);
-    }
+  if (rateLimitError) {
+    console.error("Lead rate limit check failed:", rateLimitError);
+    return { success: false, error: "We couldn't verify your request. Please try again." };
   }
+
+  if (count >= 3) {
+    return { success: false, error: "Too many requests. Please try again later." };
+  }
+
+  const { error: insertLeadError } = await insertLeadRow({
+    email,
+    company,
+    role,
+    team_size: teamSize,
+    audit_id: auditId,
+    created_at: new Date().toISOString(),
+  });
+
+  if (insertLeadError) {
+    console.error("Lead insert failed:", insertLeadError);
+    return { success: false, error: "We couldn't save your details. Please try again." };
+  }
+
+  const { data: auditRow, error: auditFetchError } = await getAuditRowById(auditId);
+
+  if (auditFetchError) {
+    console.error("Audit fetch failed:", auditFetchError);
+    return {
+      success: false,
+      error: "We couldn't load your audit details for the email. Please rerun the audit.",
+    };
+  }
+
+  const auditForEmail = auditRow ? mapAuditRowToResult(auditRow) : null;
 
   if (!auditForEmail) {
     return {
@@ -141,15 +134,31 @@ export async function captureLead(
 }
 
 export async function getAuditBySlug(slug: string): Promise<AuditResult | null> {
-  if (!readEnv("NEXT_PUBLIC_SUPABASE_URL") || !readEnv("SUPABASE_SERVICE_ROLE_KEY")) {
+  if (!hasSupabaseServerConfig()) {
     return null;
   }
 
-  const { data } = await supabaseAdmin
-    .from("audits")
-    .select("*")
-    .eq("share_slug", slug)
-    .single();
+  const { data, error } = await getAuditRowBySlug(slug);
+
+  if (error) {
+    console.error("Audit share lookup failed:", error);
+  }
+
+  if (!data) return null;
+
+  return mapAuditRowToResult(data);
+}
+
+export async function getAuditById(id: string): Promise<AuditResult | null> {
+  if (!hasSupabaseServerConfig()) {
+    return null;
+  }
+
+  const { data, error } = await getAuditRowById(id);
+
+  if (error) {
+    console.error("Audit lookup failed:", error);
+  }
 
   if (!data) return null;
 

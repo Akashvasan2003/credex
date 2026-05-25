@@ -60,7 +60,6 @@ export function LeadCaptureModal({ audit, onClose }: LeadCaptureModalProps) {
       teamSize: data.teamSize,
       auditId: audit.id,
       honeypot: data.honeypot,
-      auditSnapshot: audit,
     });
 
     if (result.success) {

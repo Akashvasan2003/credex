@@ -2,7 +2,6 @@ import { Resend } from "resend";
 import { readEnv } from "@/lib/env";
 import type { AuditResult, LeadCapture } from "@/types";
 import { formatCurrency } from "@/utils/format";
-import { serializeAuditForShare } from "@/utils/share";
 
 function getResend() {
   return new Resend(readEnv("RESEND_API_KEY"));
@@ -20,7 +19,7 @@ export async function sendAuditEmail(
   const from = readEnv("RESEND_FROM_EMAIL") || "onboarding@resend.dev";
   const appUrl = readEnv("NEXT_PUBLIC_APP_URL");
   const shareUrl = appUrl
-    ? `${appUrl}/share/${audit.shareSlug || audit.id}?data=${encodeURIComponent(serializeAuditForShare(audit))}`
+    ? `${appUrl}/share/${audit.shareSlug || audit.id}`
     : `/share/${audit.shareSlug || audit.id}`;
   const hasSavings = audit.totalAnnualSavings > 0;
   const toolsAudited = audit.recommendations.length;

@@ -19,7 +19,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LeadCaptureModal } from "@/features/results/LeadCaptureModal";
 import { formatCurrency } from "@/utils/format";
-import { serializeAuditForShare } from "@/utils/share";
 import type { AuditResult, ToolRecommendation } from "@/types";
 
 const fadeUp: Variants = {
@@ -149,7 +148,7 @@ export default function ResultsPage({ audit, isShared = false }: ResultsPageProp
   const maxSpend = Math.max(...audit.recommendations.map((r) => r.currentSpend), 1);
   const hasSavings = audit.totalMonthlySavings > 0;
   const showCredex = audit.totalAnnualSavings >= 500;
-  const sharePath = `/share/${audit.shareSlug || audit.id}?data=${encodeURIComponent(serializeAuditForShare(audit))}`;
+  const sharePath = `/share/${audit.shareSlug || audit.id}`;
 
   async function handleShare() {
     const url = `${window.location.origin}${sharePath}`;

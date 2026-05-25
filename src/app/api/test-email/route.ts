@@ -2,20 +2,8 @@ import { connection } from "next/server";
 import { NextRequest, NextResponse } from "next/server";
 import { readEnv } from "@/lib/env";
 import { sendAuditEmail } from "@/lib/email/audit-email";
-import { supabaseAdmin } from "@/lib/supabase/server";
+import { getAuditRowById, type AuditRow } from "@/lib/supabase/server";
 import type { AuditResult, LeadCapture } from "@/types";
-
-interface AuditRow {
-  id: string;
-  input: AuditResult["input"];
-  recommendations: AuditResult["recommendations"];
-  total_monthly_spend: number;
-  total_monthly_savings: number;
-  total_annual_savings: number;
-  ai_summary: string | null;
-  created_at: string;
-  share_slug: string;
-}
 
 function mapAuditRowToResult(auditRow: AuditRow): AuditResult {
   return {
@@ -95,11 +83,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { data, error } = await supabaseAdmin
-    .from("audits")
-    .select("*")
-    .eq("id", body.auditId)
-    .single();
+  const { data, error } = await getAuditRowById(body.auditId);
 
   if (error || !data) {
     return NextResponse.json(
