@@ -118,6 +118,8 @@ async function supabaseRequest<T>(
         endpoint,
         {
           method: init?.method ?? "GET",
+          family: 4,
+          timeout: 15000,
           headers: Object.fromEntries(headers.entries()),
         },
         (res) => {
@@ -148,6 +150,9 @@ async function supabaseRequest<T>(
       );
 
       req.on("error", (error) => reject(error));
+      req.on("timeout", () => {
+        req.destroy(new Error("Supabase request timed out."));
+      });
 
       if (body) {
         req.write(body);
