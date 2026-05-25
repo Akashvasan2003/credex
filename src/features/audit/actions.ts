@@ -64,7 +64,7 @@ export async function submitAudit(input: AuditInput): Promise<AuditResult> {
 
   if (error) {
     console.error("Supabase insert error:", error);
-    throw new Error("We couldn't save your audit. Please try again.");
+    throw new Error(`Supabase insert error: ${error}`);
   }
 
   return result;
