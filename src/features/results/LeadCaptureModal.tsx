@@ -130,7 +130,7 @@ export function LeadCaptureModal({ audit, onClose }: LeadCaptureModalProps) {
               </div>
 
               <p className="text-sm text-white/50 mb-6 leading-relaxed">
-                We'll email you a detailed audit report with all recommendations, savings breakdown, and implementation steps.
+                We&apos;ll email you a detailed audit report with all recommendations, savings breakdown, and implementation steps.
               </p>
 
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
