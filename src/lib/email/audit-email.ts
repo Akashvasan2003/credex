@@ -2,6 +2,7 @@ import { Resend } from "resend";
 import { readEnv } from "@/lib/env";
 import type { AuditResult, LeadCapture } from "@/types";
 import { formatCurrency } from "@/utils/format";
+import { serializeAuditForShare } from "@/utils/share";
 
 function getResend() {
   return new Resend(readEnv("RESEND_API_KEY"));
@@ -18,6 +19,9 @@ export async function sendAuditEmail(
 
   const from = readEnv("RESEND_FROM_EMAIL") || "onboarding@resend.dev";
   const appUrl = readEnv("NEXT_PUBLIC_APP_URL");
+  const shareUrl = appUrl
+    ? `${appUrl}/share/${audit.shareSlug || audit.id}?data=${encodeURIComponent(serializeAuditForShare(audit))}`
+    : `/share/${audit.shareSlug || audit.id}`;
   const hasSavings = audit.totalAnnualSavings > 0;
   const toolsAudited = audit.recommendations.length;
   const topSaving = [...audit.recommendations]
@@ -82,7 +86,7 @@ ${topSaving ? `
 ` : ""}
 
 <tr><td style="padding:0 40px 40px;text-align:center;">
-<a href="${appUrl}/share/${audit.shareSlug || audit.id}"
+<a href="${shareUrl}"
    style="display:inline-block;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:8px;font-size:15px;font-weight:600;">
   View Full Audit Report
 </a>

@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LeadCaptureModal } from "@/features/results/LeadCaptureModal";
 import { formatCurrency } from "@/utils/format";
+import { serializeAuditForShare } from "@/utils/share";
 import type { AuditResult, ToolRecommendation } from "@/types";
 
 const fadeUp: Variants = {
@@ -148,9 +149,10 @@ export default function ResultsPage({ audit, isShared = false }: ResultsPageProp
   const maxSpend = Math.max(...audit.recommendations.map((r) => r.currentSpend), 1);
   const hasSavings = audit.totalMonthlySavings > 0;
   const showCredex = audit.totalAnnualSavings >= 500;
+  const sharePath = `/share/${audit.shareSlug || audit.id}?data=${encodeURIComponent(serializeAuditForShare(audit))}`;
 
   async function handleShare() {
-    const url = `${window.location.origin}/share/${audit.shareSlug || audit.id}`;
+    const url = `${window.location.origin}${sharePath}`;
     await navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -368,7 +370,7 @@ export default function ResultsPage({ audit, isShared = false }: ResultsPageProp
                 <Share2 className="w-3.5 h-3.5" />
                 {copied ? "Copied!" : "Copy Link"}
               </Button>
-              <Link href={`/share/${audit.shareSlug}`} target="_blank">
+              <Link href={sharePath} target="_blank">
                 <Button variant="ghost" size="sm">
                   Preview <ExternalLink className="w-3.5 h-3.5" />
                 </Button>

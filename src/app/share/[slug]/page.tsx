@@ -2,14 +2,17 @@ import type { Metadata } from "next";
 import { getAuditBySlug } from "@/features/audit/actions";
 import ResultsPage from "@/features/results/ResultsPage";
 import { formatCurrency } from "@/utils/format";
+import { deserializeAuditFromShare } from "@/utils/share";
 
 interface Props {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ data?: string }>;
 }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const audit = await getAuditBySlug(slug);
+  const { data } = await searchParams;
+  const audit = (await getAuditBySlug(slug)) ?? deserializeAuditFromShare(data);
 
   if (!audit) {
     return { title: "Audit Not Found" };
@@ -41,9 +44,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function SharePage({ params }: Props) {
+export default async function SharePage({ params, searchParams }: Props) {
   const { slug } = await params;
-  const audit = await getAuditBySlug(slug);
+  const { data } = await searchParams;
+  const audit = (await getAuditBySlug(slug)) ?? deserializeAuditFromShare(data);
 
   if (!audit) {
     return (
