@@ -33,9 +33,14 @@ create index if not exists leads_created_at_idx on leads(created_at desc);
 
 -- RLS: audits are publicly readable (for share links)
 alter table audits enable row level security;
+drop policy if exists "Audits are publicly readable" on audits;
+drop policy if exists "Service role can insert audits" on audits;
+drop policy if exists "Anyone can insert audits" on audits;
 create policy "Audits are publicly readable" on audits for select using (true);
-create policy "Service role can insert audits" on audits for insert with check (true);
+create policy "Anyone can insert audits" on audits for insert with check (true);
 
 -- RLS: leads are private
 alter table leads enable row level security;
-create policy "Service role only" on leads for all using (false);
+drop policy if exists "Service role only" on leads;
+drop policy if exists "Anyone can insert leads" on leads;
+create policy "Anyone can insert leads" on leads for insert with check (true);

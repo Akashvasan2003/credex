@@ -7,8 +7,11 @@ import { Plus, Trash2, Zap, ArrowRight, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { submitAudit } from "@/features/audit/actions";
+import { runAudit } from "@/features/audit/engine";
 import { TOOL_PLANS, TOOL_DISPLAY_NAMES } from "@/lib/pricing";
+import { buildFallbackSummary } from "@/lib/ai/fallback-summary";
+import { mapAuditResultToRow } from "@/lib/audit-row";
+import { supabase } from "@/lib/supabase/client";
 import { nanoid } from "@/utils/nanoid";
 import type { AuditInput, AuditResult, ToolEntry, UseCase } from "@/types";
 
@@ -45,13 +48,11 @@ export default function AuditForm() {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Load from localStorage
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved) as AuditInput;
-        // Use functional updates to avoid setState-in-effect lint warning
         queueMicrotask(() => {
           setTools(parsed.tools);
           setTeamSize(parsed.teamSize);
@@ -61,7 +62,6 @@ export default function AuditForm() {
     } catch {}
   }, []);
 
-  // Save to localStorage
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ tools, teamSize, useCase }));
@@ -69,59 +69,72 @@ export default function AuditForm() {
   }, [tools, teamSize, useCase]);
 
   const addTool = useCallback(() => {
-    setTools((prev) => [...prev, createEntry()]);
+    setTools((previous) => [...previous, createEntry()]);
   }, []);
 
   const removeTool = useCallback((id: string) => {
-    setTools((prev) => prev.filter((t) => t.id !== id));
+    setTools((previous) => previous.filter((tool) => tool.id !== id));
   }, []);
 
   const updateTool = useCallback((id: string, field: keyof ToolEntry, value: string | number) => {
-    setTools((prev) =>
-      prev.map((t) => {
-        if (t.id !== id) return t;
+    setTools((previous) =>
+      previous.map((tool) => {
+        if (tool.id !== id) return tool;
         if (field === "tool") {
           const firstPlan = TOOL_PLANS[value as string]?.[0]?.value ?? "pro";
-          return { ...t, tool: value as ToolEntry["tool"], plan: firstPlan };
+          return { ...tool, tool: value as ToolEntry["tool"], plan: firstPlan };
         }
-        return { ...t, [field]: value };
+        return { ...tool, [field]: value };
       })
     );
   }, []);
 
   function validate(): boolean {
-    const errs: Record<string, string> = {};
-    if (tools.length === 0) errs.tools = "Add at least one tool";
-    tools.forEach((t) => {
-      if (t.monthlySpend < 0) errs[`${t.id}_spend`] = "Must be ≥ 0";
-      if (t.seats < 1) errs[`${t.id}_seats`] = "Must be ≥ 1";
+    const nextErrors: Record<string, string> = {};
+    if (tools.length === 0) nextErrors.tools = "Add at least one tool";
+    tools.forEach((tool) => {
+      if (tool.monthlySpend < 0) nextErrors[`${tool.id}_spend`] = "Must be >= 0";
+      if (tool.seats < 1) nextErrors[`${tool.id}_seats`] = "Must be >= 1";
     });
-    if (teamSize < 1) errs.teamSize = "Must be ≥ 1";
-    setErrors(errs);
-    return Object.keys(errs).length === 0;
+    if (teamSize < 1) nextErrors.teamSize = "Must be >= 1";
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
     if (!validate()) return;
+
     setLoading(true);
+    setErrors({});
+
     try {
-      const result: AuditResult = await submitAudit({ tools, teamSize, useCase });
+      const result: AuditResult = runAudit({ tools, teamSize, useCase });
+      result.shareSlug = nanoid(8);
+      result.aiSummary = buildFallbackSummary(result);
+
+      const { error } = await supabase.from("audits").insert(mapAuditResultToRow(result));
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
       localStorage.removeItem(STORAGE_KEY);
       router.push(`/results/${result.id}`);
-    } catch (err) {
-      console.error(err);
-      setErrors({ submit: "Something went wrong. Please try again." });
+    } catch (error) {
+      console.error(error);
+      setErrors({
+        submit: "We couldn't save your audit. Check Supabase URL, anon key, and RLS policies.",
+      });
     } finally {
       setLoading(false);
     }
   }
 
-  const totalSpend = tools.reduce((s, t) => s + (t.monthlySpend || 0), 0);
+  const totalSpend = tools.reduce((sum, tool) => sum + (tool.monthlySpend || 0), 0);
 
   return (
     <div className="min-h-screen bg-[#080808] text-white">
-      {/* Nav */}
       <nav className="border-b border-white/5 bg-[#080808]/80 backdrop-blur-xl sticky top-0 z-50">
         <div className="mx-auto max-w-3xl px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -139,20 +152,13 @@ export default function AuditForm() {
       </nav>
 
       <div className="mx-auto max-w-3xl px-6 py-12">
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-        >
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
           <div className="mb-10">
             <h1 className="text-3xl font-bold tracking-tight mb-2">Audit your AI stack</h1>
-            <p className="text-white/40">
-              Add each tool your team uses. We&apos;ll find savings in under a second.
-            </p>
+            <p className="text-white/40">Add each tool your team uses. We&apos;ll find savings in under a second.</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Global settings */}
             <Card className="space-y-4">
               <h2 className="text-sm font-semibold text-white/60 uppercase tracking-wider">Team Info</h2>
               <div className="grid grid-cols-2 gap-4">
@@ -161,28 +167,25 @@ export default function AuditForm() {
                   type="number"
                   min={1}
                   value={teamSize}
-                  onChange={(e) => setTeamSize(parseInt(e.target.value) || 1)}
+                  onChange={(event) => setTeamSize(parseInt(event.target.value, 10) || 1)}
                   error={errors.teamSize}
                 />
                 <Select
                   label="Primary Use Case"
                   options={USE_CASE_OPTIONS}
                   value={useCase}
-                  onChange={(e) => setUseCase(e.target.value as UseCase)}
+                  onChange={(event) => setUseCase(event.target.value as UseCase)}
                 />
               </div>
             </Card>
 
-            {/* Tool entries */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-semibold text-white/60 uppercase tracking-wider">AI Tools</h2>
                 <span className="text-xs text-white/30">{tools.length} tool{tools.length !== 1 ? "s" : ""}</span>
               </div>
 
-              {errors.tools && (
-                <p className="text-sm text-red-400">{errors.tools}</p>
-              )}
+              {errors.tools && <p className="text-sm text-red-400">{errors.tools}</p>}
 
               <AnimatePresence mode="popLayout">
                 {tools.map((tool, index) => (
@@ -213,13 +216,13 @@ export default function AuditForm() {
                           label="Tool"
                           options={TOOL_OPTIONS}
                           value={tool.tool}
-                          onChange={(e) => updateTool(tool.id, "tool", e.target.value)}
+                          onChange={(event) => updateTool(tool.id, "tool", event.target.value)}
                         />
                         <Select
                           label="Plan"
                           options={TOOL_PLANS[tool.tool] ?? [{ value: tool.plan, label: tool.plan }]}
                           value={tool.plan}
-                          onChange={(e) => updateTool(tool.id, "plan", e.target.value)}
+                          onChange={(event) => updateTool(tool.id, "plan", event.target.value)}
                         />
                       </div>
 
@@ -230,9 +233,7 @@ export default function AuditForm() {
                           min={0}
                           step={0.01}
                           value={tool.monthlySpend}
-                          onChange={(e) =>
-                            updateTool(tool.id, "monthlySpend", parseFloat(e.target.value) || 0)
-                          }
+                          onChange={(event) => updateTool(tool.id, "monthlySpend", parseFloat(event.target.value) || 0)}
                           error={errors[`${tool.id}_spend`]}
                         />
                         <Input
@@ -240,9 +241,7 @@ export default function AuditForm() {
                           type="number"
                           min={1}
                           value={tool.seats}
-                          onChange={(e) =>
-                            updateTool(tool.id, "seats", parseInt(e.target.value) || 1)
-                          }
+                          onChange={(event) => updateTool(tool.id, "seats", parseInt(event.target.value, 10) || 1)}
                           error={errors[`${tool.id}_seats`]}
                         />
                       </div>
@@ -261,31 +260,23 @@ export default function AuditForm() {
               </button>
             </div>
 
-            {/* Tip */}
             <div className="flex gap-3 rounded-xl border border-indigo-500/15 bg-indigo-500/5 p-4">
               <Info className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
               <p className="text-sm text-white/40 leading-relaxed">
-                Enter your actual monthly spend (check your billing dashboard). For API tools, enter last month&apos;s invoice total.
+                Enter your actual monthly spend from your billing dashboard. For API tools, enter last month&apos;s invoice total.
               </p>
             </div>
 
-            {errors.submit && (
-              <p className="text-sm text-red-400 text-center">{errors.submit}</p>
-            )}
+            {errors.submit && <p className="text-sm text-red-400 text-center">{errors.submit}</p>}
 
-            <Button
-              type="submit"
-              size="lg"
-              loading={loading}
-              className="w-full"
-            >
-              {loading ? "Analyzing your stack..." : "Run Audit"}
+            <Button type="submit" size="lg" loading={loading} className="w-full">
+              {loading ? "Saving your audit..." : "Run Audit"}
               {!loading && <ArrowRight className="w-4 h-4" />}
             </Button>
 
-              <p className="text-center text-xs text-white/20">
-                Free forever &middot; No account needed &middot; Results in seconds
-              </p>
+            <p className="text-center text-xs text-white/20">
+              Free forever &middot; No account needed &middot; Results in seconds
+            </p>
           </form>
         </motion.div>
       </div>

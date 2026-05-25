@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { buildFallbackSummary } from "@/lib/ai/fallback-summary";
 import type { AuditResult } from "@/types";
 import { formatCurrency } from "@/utils/format";
 
@@ -7,8 +8,12 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 function buildPrompt(audit: AuditResult): string {
   const toolSummary = audit.recommendations
     .map(
-      (r) =>
-        `- ${r.toolName} (${r.currentPlan}): $${r.currentSpend}/mo → ${r.isOptimized ? "optimized" : `save $${r.monthlySavings}/mo by switching to ${r.recommendedPlan}`}`
+      (recommendation) =>
+        `- ${recommendation.toolName} (${recommendation.currentPlan}): $${recommendation.currentSpend}/mo -> ${
+          recommendation.isOptimized
+            ? "optimized"
+            : `save $${recommendation.monthlySavings}/mo by switching to ${recommendation.recommendedPlan}`
+        }`
     )
     .join("\n");
 
@@ -26,19 +31,12 @@ ${toolSummary}
 Write a helpful, smart, non-salesy summary. Be specific about the biggest savings opportunity. End with one actionable next step. Do not use bullet points. Plain prose only.`;
 }
 
-function fallbackSummary(audit: AuditResult): string {
-  if (audit.totalMonthlySavings > 0) {
-    return `Your team is spending ${formatCurrency(audit.totalMonthlySpend)}/month on AI tools with ${formatCurrency(audit.totalMonthlySavings)}/month in identified savings — ${formatCurrency(audit.totalAnnualSavings)} annually. The biggest opportunity is optimizing your ${audit.recommendations.sort((a, b) => b.monthlySavings - a.monthlySavings)[0]?.toolName} plan. Review the recommendations below and implement the highest-confidence changes first to capture savings without disrupting your workflow.`;
-  }
-  return `Your team is spending ${formatCurrency(audit.totalMonthlySpend)}/month on AI tools and your stack looks well-optimized. You're making smart choices with your current plans. As your team grows, revisit this audit — pricing tiers and alternatives shift frequently in the AI space.`;
-}
-
 export async function generateAISummary(audit: AuditResult): Promise<string> {
   if (!process.env.ANTHROPIC_API_KEY) {
-    return fallbackSummary(audit);
+    return buildFallbackSummary(audit);
   }
 
-  for (let attempt = 1; attempt <= 3; attempt++) {
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
       const message = await client.messages.create({
         model: "claude-3-5-haiku-20241022",
@@ -50,14 +48,15 @@ export async function generateAISummary(audit: AuditResult): Promise<string> {
       if (content.type === "text" && content.text.trim()) {
         return content.text.trim();
       }
-    } catch (err) {
+    } catch (error) {
       if (attempt === 3) {
-        console.error("AI summary failed after 3 attempts:", err);
-        return fallbackSummary(audit);
+        console.error("AI summary failed after 3 attempts:", error);
+        return buildFallbackSummary(audit);
       }
-      await new Promise((r) => setTimeout(r, 1000 * attempt));
+
+      await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
     }
   }
 
-  return fallbackSummary(audit);
+  return buildFallbackSummary(audit);
 }

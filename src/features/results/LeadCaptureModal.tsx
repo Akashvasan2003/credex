@@ -8,7 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/input";
-import { captureLead } from "@/features/audit/actions";
+import { supabase } from "@/lib/supabase/client";
 import { formatCurrency } from "@/utils/format";
 import type { AuditResult } from "@/types";
 
@@ -53,14 +53,38 @@ export function LeadCaptureModal({ audit, onClose }: LeadCaptureModalProps) {
   async function onSubmit(data: FormData) {
     setSubmitError(null);
 
-    const result = await captureLead({
+    const { error: leadError } = await supabase.from("leads").insert({
       email: data.email,
       company: data.company,
       role: data.role,
-      teamSize: data.teamSize,
-      auditId: audit.id,
-      honeypot: data.honeypot,
+      team_size: data.teamSize,
+      audit_id: audit.id,
+      created_at: new Date().toISOString(),
     });
+
+    if (leadError) {
+      setSubmitError("We couldn't save your details in Supabase.");
+      return;
+    }
+
+    const response = await fetch("/api/send-report", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        lead: {
+          email: data.email,
+          company: data.company,
+          role: data.role,
+          teamSize: data.teamSize,
+          auditId: audit.id,
+        },
+        audit,
+      }),
+    });
+
+    const result = (await response.json()) as { success: boolean; error?: string };
 
     if (result.success) {
       setSubmitted(true);
@@ -108,7 +132,7 @@ export function LeadCaptureModal({ audit, onClose }: LeadCaptureModalProps) {
               </motion.div>
               <h2 className="text-xl font-bold text-white mb-2">Report sent!</h2>
               <p className="text-white/50 text-sm leading-relaxed">
-                Check your inbox for your full audit report with all recommendations and savings breakdown.
+                Check your inbox for your full audit report with recommendations and savings breakdown.
               </p>
               <Button className="mt-6 w-full" onClick={onClose}>
                 Done
@@ -129,7 +153,7 @@ export function LeadCaptureModal({ audit, onClose }: LeadCaptureModalProps) {
               </div>
 
               <p className="text-sm text-white/50 mb-6 leading-relaxed">
-                We&apos;ll email you a detailed audit report with all recommendations, savings breakdown, and implementation steps.
+                We&apos;ll email you a detailed audit report with recommendations, savings breakdown, and implementation steps.
               </p>
 
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -176,13 +200,9 @@ export function LeadCaptureModal({ audit, onClose }: LeadCaptureModalProps) {
                   Send My Report
                 </Button>
 
-                {submitError && (
-                  <p className="text-center text-sm text-red-400">{submitError}</p>
-                )}
+                {submitError && <p className="text-center text-sm text-red-400">{submitError}</p>}
 
-                <p className="text-center text-xs text-white/20">
-                  No spam. Unsubscribe anytime.
-                </p>
+                <p className="text-center text-xs text-white/20">No spam. Unsubscribe anytime.</p>
               </form>
             </div>
           )}
