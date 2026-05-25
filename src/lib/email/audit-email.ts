@@ -18,6 +18,8 @@ export async function sendAuditEmail(
 
   const from = readEnv("RESEND_FROM_EMAIL") || "onboarding@resend.dev";
   const appUrl = readEnv("NEXT_PUBLIC_APP_URL");
+  const hasSavings = audit.totalAnnualSavings > 0;
+  const toolsAudited = audit.recommendations.length;
   const topSaving = [...audit.recommendations]
     .filter((r) => !r.isOptimized)
     .sort((a, b) => b.monthlySavings - a.monthlySavings)[0];
@@ -48,16 +50,24 @@ export async function sendAuditEmail(
 <table width="100%" cellpadding="0" cellspacing="0">
 <tr>
 <td width="48%" style="background:#1a1a2e;border-radius:12px;padding:24px;text-align:center;border:1px solid #2d2d4e;">
-<div style="font-size:32px;font-weight:700;color:#6366f1;">${formatCurrency(audit.totalMonthlySavings)}</div>
-<div style="font-size:13px;color:#9ca3af;margin-top:4px;">Monthly Savings</div>
+<div style="font-size:32px;font-weight:700;color:#6366f1;">${formatCurrency(audit.totalMonthlySpend)}</div>
+<div style="font-size:13px;color:#9ca3af;margin-top:4px;">Current Monthly Spend</div>
 </td>
 <td width="4%"></td>
 <td width="48%" style="background:#1a2e1a;border-radius:12px;padding:24px;text-align:center;border:1px solid #2d4e2d;">
-<div style="font-size:32px;font-weight:700;color:#22c55e;">${formatCurrency(audit.totalAnnualSavings)}</div>
-<div style="font-size:13px;color:#9ca3af;margin-top:4px;">Annual Savings</div>
+<div style="font-size:32px;font-weight:700;color:#22c55e;">${toolsAudited}</div>
+<div style="font-size:13px;color:#9ca3af;margin-top:4px;">Tools Audited</div>
 </td>
 </tr>
 </table>
+</td></tr>
+
+<tr><td style="padding:0 40px 32px;">
+<div style="background:#1c1c1c;border-radius:12px;padding:24px;border:1px solid #2a2a2a;">
+<div style="font-size:12px;color:#6366f1;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">Audit Summary</div>
+<div style="color:#e5e7eb;font-size:15px;font-weight:600;">${hasSavings ? `${formatCurrency(audit.totalAnnualSavings)}/yr in savings identified` : "Your stack looks well-optimized"}</div>
+<div style="color:#9ca3af;font-size:14px;margin-top:8px;line-height:1.5;">${hasSavings ? `We found ${formatCurrency(audit.totalMonthlySavings)}/mo in potential savings across ${toolsAudited} tool${toolsAudited === 1 ? "" : "s"}.` : `No significant savings were identified. Your current stack is spending ${formatCurrency(audit.totalMonthlySpend)}/month efficiently across ${toolsAudited} tool${toolsAudited === 1 ? "" : "s"}.`}</div>
+</div>
 </td></tr>
 
 ${topSaving ? `
