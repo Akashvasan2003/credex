@@ -98,7 +98,13 @@ export async function captureLead(
       createdAt: auditRow.created_at,
       shareSlug: auditRow.share_slug,
     };
-    await sendAuditEmail({ email, company, role, teamSize, auditId }, audit);
+    try {
+      await sendAuditEmail({ email, company, role, teamSize, auditId }, audit);
+    } catch (err) {
+      console.error("sendAuditEmail failed:", err);
+    }
+  } else {
+    console.error("Audit not found for id:", auditId);
   }
 
   return { success: true };
