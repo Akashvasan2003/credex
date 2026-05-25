@@ -1,4 +1,6 @@
+import { connection } from "next/server";
 import { NextRequest, NextResponse } from "next/server";
+import { readEnv } from "@/lib/env";
 import { sendAuditEmail } from "@/lib/email/audit-email";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import type { AuditResult, LeadCapture } from "@/types";
@@ -30,9 +32,11 @@ function mapAuditRowToResult(auditRow: AuditRow): AuditResult {
 }
 
 export async function POST(request: NextRequest) {
-  const configuredSecret = process.env.TEST_EMAIL_SECRET;
-  const hasSupabaseUrl = !!process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const hasServiceRoleKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+  await connection();
+
+  const configuredSecret = readEnv("TEST_EMAIL_SECRET");
+  const hasSupabaseUrl = !!readEnv("NEXT_PUBLIC_SUPABASE_URL");
+  const hasServiceRoleKey = !!readEnv("SUPABASE_SERVICE_ROLE_KEY");
 
   if (!configuredSecret) {
     return NextResponse.json(

@@ -1,20 +1,23 @@
 import { Resend } from "resend";
+import { readEnv } from "@/lib/env";
 import type { AuditResult, LeadCapture } from "@/types";
 import { formatCurrency } from "@/utils/format";
 
 function getResend() {
-  return new Resend(process.env.RESEND_API_KEY);
+  return new Resend(readEnv("RESEND_API_KEY"));
 }
 
 export async function sendAuditEmail(
   lead: LeadCapture,
   audit: AuditResult
 ): Promise<{ success: boolean; error?: string }> {
-  if (!process.env.RESEND_API_KEY) {
+  const resendApiKey = readEnv("RESEND_API_KEY");
+  if (!resendApiKey) {
     return { success: false, error: "Email is not configured on the server." };
   }
 
-  const from = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
+  const from = readEnv("RESEND_FROM_EMAIL") || "onboarding@resend.dev";
+  const appUrl = readEnv("NEXT_PUBLIC_APP_URL");
   const topSaving = [...audit.recommendations]
     .filter((r) => !r.isOptimized)
     .sort((a, b) => b.monthlySavings - a.monthlySavings)[0];
@@ -69,7 +72,7 @@ ${topSaving ? `
 ` : ""}
 
 <tr><td style="padding:0 40px 40px;text-align:center;">
-<a href="${process.env.NEXT_PUBLIC_APP_URL}/share/${audit.shareSlug || audit.id}"
+<a href="${appUrl}/share/${audit.shareSlug || audit.id}"
    style="display:inline-block;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:8px;font-size:15px;font-weight:600;">
   View Full Audit Report
 </a>

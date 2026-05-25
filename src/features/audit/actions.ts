@@ -1,6 +1,7 @@
 "use server";
 
 import { z } from "zod";
+import { readEnv } from "@/lib/env";
 import { generateAISummary } from "@/lib/ai/summary";
 import { sendAuditEmail } from "@/lib/email/audit-email";
 import { supabaseAdmin } from "@/lib/supabase/server";
@@ -48,7 +49,7 @@ export async function submitAudit(input: AuditInput): Promise<AuditResult> {
 
   result.aiSummary = await generateAISummary(result);
 
-  if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  if (readEnv("NEXT_PUBLIC_SUPABASE_URL") && readEnv("SUPABASE_SERVICE_ROLE_KEY")) {
     const { error } = await supabaseAdmin.from("audits").insert({
       id: result.id,
       share_slug: shareSlug,
@@ -81,7 +82,7 @@ export async function captureLead(
   const { email, company, role, teamSize, auditId } = parsed.data;
   const auditSnapshot = data.auditSnapshot;
   const hasSupabase =
-    !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+    !!readEnv("NEXT_PUBLIC_SUPABASE_URL") && !!readEnv("SUPABASE_SERVICE_ROLE_KEY");
 
   if (hasSupabase) {
     const oneHourAgo = new Date(Date.now() - 3600000).toISOString();
@@ -142,7 +143,7 @@ export async function captureLead(
 }
 
 export async function getAuditBySlug(slug: string): Promise<AuditResult | null> {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  if (!readEnv("NEXT_PUBLIC_SUPABASE_URL") || !readEnv("SUPABASE_SERVICE_ROLE_KEY")) {
     return null;
   }
 
