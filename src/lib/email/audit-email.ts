@@ -101,7 +101,7 @@ ${audit.aiSummary ? `
 </html>`;
 
   await getResend().emails.send({
-    from: "SpendLens <audit@spendlens.ai>",
+    from: "SpendLens <onboarding@resend.dev>",
     to: lead.email,
     subject: `Your AI Spend Audit: ${formatCurrency(audit.totalAnnualSavings)}/yr in savings identified`,
     html,

@@ -27,7 +27,7 @@ export async function submitAudit(input: AuditInput): Promise<AuditResult> {
 
   // Store in Supabase
   if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    await supabaseAdmin.from("audits").insert({
+    const { error } = await supabaseAdmin.from("audits").insert({
       id: result.id,
       share_slug: shareSlug,
       input: result.input,
@@ -38,6 +38,7 @@ export async function submitAudit(input: AuditInput): Promise<AuditResult> {
       ai_summary: result.aiSummary,
       created_at: result.createdAt,
     });
+    if (error) console.error("Supabase insert error:", error.message);
   }
 
   return result;
