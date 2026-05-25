@@ -94,10 +94,9 @@ export async function captureLead(
 
     if (rateLimitError) {
       console.error("Lead rate limit check failed:", rateLimitError.message);
-      return { success: false, error: "We couldn't verify your request. Please try again." };
     }
 
-    if ((count ?? 0) >= 3) {
+    if (!rateLimitError && (count ?? 0) >= 3) {
       return { success: false, error: "Too many requests. Please try again later." };
     }
 
@@ -112,7 +111,6 @@ export async function captureLead(
 
     if (insertLeadError) {
       console.error("Lead insert failed:", insertLeadError.message);
-      return { success: false, error: "We couldn't save your request. Please try again." };
     }
   }
 
