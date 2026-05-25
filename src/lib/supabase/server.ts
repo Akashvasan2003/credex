@@ -1,5 +1,6 @@
 import "server-only";
 
+import { request as httpsRequest } from "node:https";
 import { readEnv } from "@/lib/env";
 import type { AuditResult } from "@/types";
 
@@ -28,6 +29,13 @@ interface SupabaseResponse<T> {
   count?: number | null;
   data: T | null;
   error: string | null;
+}
+
+interface HttpResponse {
+  status: number;
+  statusText: string;
+  headers: Headers;
+  body: string;
 }
 
 function getSupabaseServerConfig() {
@@ -60,8 +68,8 @@ function buildHeaders(extra?: HeadersInit): Headers {
   return headers;
 }
 
-async function parseSupabaseError(response: Response): Promise<string> {
-  const body = await response.text();
+async function parseSupabaseError(response: HttpResponse): Promise<string> {
+  const body = response.body;
 
   if (!body) {
     return `${response.status} ${response.statusText}`;
@@ -102,13 +110,53 @@ async function supabaseRequest<T>(
   try {
     const endpoint = new URL(`/rest/v1/${path}`, `${config.supabaseUrl}/`);
 
-    const response = await fetch(endpoint, {
-      ...init,
-      cache: "no-store",
-      headers: buildHeaders(init?.headers),
+    const headers = buildHeaders(init?.headers);
+    const body = typeof init?.body === "string" ? init.body : undefined;
+
+    const response = await new Promise<HttpResponse>((resolve, reject) => {
+      const req = httpsRequest(
+        endpoint,
+        {
+          method: init?.method ?? "GET",
+          headers: Object.fromEntries(headers.entries()),
+        },
+        (res) => {
+          let chunks = "";
+
+          res.setEncoding("utf8");
+          res.on("data", (chunk) => {
+            chunks += chunk;
+          });
+          res.on("end", () => {
+            const responseHeaders = new Headers();
+            for (const [key, value] of Object.entries(res.headers)) {
+              if (Array.isArray(value)) {
+                responseHeaders.set(key, value.join(", "));
+              } else if (typeof value === "string") {
+                responseHeaders.set(key, value);
+              }
+            }
+
+            resolve({
+              status: res.statusCode ?? 500,
+              statusText: res.statusMessage ?? "Unknown",
+              headers: responseHeaders,
+              body: chunks,
+            });
+          });
+        }
+      );
+
+      req.on("error", (error) => reject(error));
+
+      if (body) {
+        req.write(body);
+      }
+
+      req.end();
     });
 
-    if (!response.ok) {
+    if (response.status < 200 || response.status >= 300) {
       return { data: null, error: await parseSupabaseError(response) };
     }
 
@@ -119,7 +167,7 @@ async function supabaseRequest<T>(
       return { data: null, error: null, count };
     }
 
-    const text = await response.text();
+    const text = response.body;
     const data = text ? (JSON.parse(text) as T) : null;
     return { data, error: null, count };
   } catch (error) {
