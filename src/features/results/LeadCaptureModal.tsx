@@ -16,11 +16,12 @@ const schema = z.object({
   email: z.string().email("Valid email required"),
   company: z.string().min(1, "Company name required").max(100),
   role: z.string().min(1, "Role required").max(100),
-  teamSize: z.number().int().min(1).max(100000),
+  teamSize: z.coerce.number().int().min(1).max(100000),
   honeypot: z.string().max(0),
 });
 
-type FormData = z.infer<typeof schema>;
+type FormInput = z.input<typeof schema>;
+type FormData = z.output<typeof schema>;
 
 const ROLE_OPTIONS = [
   { value: "founder", label: "Founder / CEO" },
@@ -38,36 +39,41 @@ interface LeadCaptureModalProps {
 
 export function LeadCaptureModal({ audit, onClose }: LeadCaptureModalProps) {
   const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<FormData>({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    resolver: zodResolver(schema) as any,
+  } = useForm<FormInput, undefined, FormData>({
+    resolver: zodResolver(schema),
     defaultValues: { teamSize: audit.input.teamSize, honeypot: "" },
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async function onSubmit(data: any) {
+  async function onSubmit(data: FormData) {
+    setSubmitError(null);
+
     const result = await captureLead({
       email: data.email,
       company: data.company,
       role: data.role,
-      teamSize: Number(data.teamSize),
+      teamSize: data.teamSize,
       auditId: audit.id,
       honeypot: data.honeypot,
+      auditSnapshot: audit,
     });
+
     if (result.success) {
       setSubmitted(true);
+      return;
     }
+
+    setSubmitError(result.error ?? "We couldn't send the email. Please try again.");
   }
 
   return (
     <AnimatePresence>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        {/* Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -76,7 +82,6 @@ export function LeadCaptureModal({ audit, onClose }: LeadCaptureModalProps) {
           onClick={onClose}
         />
 
-        {/* Modal */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 16 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -112,7 +117,6 @@ export function LeadCaptureModal({ audit, onClose }: LeadCaptureModalProps) {
             </div>
           ) : (
             <div className="p-8">
-              {/* Header */}
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center">
                   <Zap className="w-5 h-5 text-white" />
@@ -126,11 +130,10 @@ export function LeadCaptureModal({ audit, onClose }: LeadCaptureModalProps) {
               </div>
 
               <p className="text-sm text-white/50 mb-6 leading-relaxed">
-                We&apos;ll email you a detailed audit report with all recommendations, savings breakdown, and implementation steps.
+                We'll email you a detailed audit report with all recommendations, savings breakdown, and implementation steps.
               </p>
 
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                {/* Honeypot — hidden from real users */}
                 <input
                   {...register("honeypot")}
                   type="text"
@@ -173,6 +176,10 @@ export function LeadCaptureModal({ audit, onClose }: LeadCaptureModalProps) {
                 <Button type="submit" loading={isSubmitting} className="w-full">
                   Send My Report
                 </Button>
+
+                {submitError && (
+                  <p className="text-center text-sm text-red-400">{submitError}</p>
+                )}
 
                 <p className="text-center text-xs text-white/20">
                   No spam. Unsubscribe anytime.

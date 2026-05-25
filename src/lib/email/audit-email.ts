@@ -6,13 +6,16 @@ function getResend() {
   return new Resend(process.env.RESEND_API_KEY);
 }
 
-export async function sendAuditEmail(lead: LeadCapture, audit: AuditResult): Promise<void> {
+export async function sendAuditEmail(
+  lead: LeadCapture,
+  audit: AuditResult
+): Promise<{ success: boolean; error?: string }> {
   if (!process.env.RESEND_API_KEY) {
-    console.warn("RESEND_API_KEY not set — skipping email");
-    return;
+    return { success: false, error: "Email is not configured on the server." };
   }
 
-  const topSaving = audit.recommendations
+  const from = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
+  const topSaving = [...audit.recommendations]
     .filter((r) => !r.isOptimized)
     .sort((a, b) => b.monthlySavings - a.monthlySavings)[0];
 
@@ -21,7 +24,7 @@ export async function sendAuditEmail(lead: LeadCapture, audit: AuditResult): Pro
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Your AI Spend Audit — SpendLens</title>
+<title>Your AI Spend Audit - SpendLens</title>
 </head>
 <body style="margin:0;padding:0;background:#0a0a0a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;padding:40px 20px;">
@@ -84,17 +87,35 @@ ${topSaving ? `
 
   try {
     const { data, error } = await getResend().emails.send({
-      from: "onboarding@resend.dev",
+      from,
       to: lead.email,
       subject: `Your AI Spend Audit: ${formatCurrency(audit.totalAnnualSavings)}/yr in savings identified`,
       html,
     });
+
     if (error) {
       console.error("Resend error:", JSON.stringify(error));
-    } else {
-      console.log("Email sent successfully:", data?.id);
+      return {
+        success: false,
+        error:
+          "We couldn't send the email from the configured sender. Check your Resend domain and from address.",
+      };
     }
+
+    if (!data?.id) {
+      return {
+        success: false,
+        error: "Email provider did not confirm delivery.",
+      };
+    }
+
+    console.log("Email sent successfully:", data.id);
+    return { success: true };
   } catch (err) {
     console.error("Email send failed:", err);
+    return {
+      success: false,
+      error: "Email delivery failed. Please try again in a moment.",
+    };
   }
 }
