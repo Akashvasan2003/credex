@@ -1,18 +1,47 @@
-# SpendLens — AI Spend Audit Platform
+# SpendLens - AI Spend Audit Platform
 
-> Audit your AI tool spending in 3 minutes. Get specific, defensible recommendations with real savings numbers.
+> Audit your AI tool spending in minutes. Get defensible recommendations and identify AI cost savings.
 
 **Built for the Credex AI Spend Audit assignment.**
+
+SpendLens is a no-login AI Spend Audit platform designed for startup teams and founders. Users enter their AI stack, receive instant audit recommendations, estimated savings, and an AI-generated summary, with optional lead capture and shareable audit results.
 
 ---
 
 ## Screenshots
 
-> _[Screenshot placeholder: Landing page hero]_
-> _[Screenshot placeholder: Audit form with 3 tools]_
-> _[Screenshot placeholder: Results page showing $2,400/yr savings]_
-> _[Screenshot placeholder: Lead capture modal]_
-> _[Screenshot placeholder: Shared audit link]_
+### Landing Page / Audit Flow
+![Audit Form](./brave_screenshot_credex-lqc7t5d1w-akash-s-project1.vercel.app.png)
+
+### Results Page
+![Results Page](./brave_screenshot_credex-lqc7t5d1w-akash-s-project1.vercel.app%20(1).png)
+
+### Lead Capture Modal
+![Lead Capture](./brave_screenshot_credex-lqc7t5d1w-akash-s-project1.vercel.app%20(2).png)
+
+### Email Confirmation
+![Email Confirmation](./WhatsApp%20Image%202026-05-25%20at%2018.19.47.jpeg)
+
+---
+
+## Features
+
+- AI spend input form
+- Multi-tool audit engine
+- Savings recommendations
+- AI-generated summary with fallback
+- Supabase lead capture
+- Email report delivery
+- Shareable audit results
+- LocalStorage persistence
+
+---
+
+## Important Note About Email Delivery
+
+Email sending is currently configured and working for my own testing email only.
+
+Because I do not have a verified production email domain configured with Resend, email delivery may be limited outside testing. The lead capture flow, backend save, and email template system are fully implemented.
 
 ---
 
@@ -37,7 +66,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000)
+Open http://localhost:3000
 
 ---
 
@@ -47,7 +76,7 @@ Open [http://localhost:3000](http://localhost:3000)
 npx vercel --prod
 ```
 
-Set environment variables in Vercel dashboard (same as .env.example).
+Set environment variables in Vercel dashboard.
 
 ---
 
@@ -61,27 +90,17 @@ npm run test
 
 ## 5 Key Tradeoff Decisions
 
-### 1. No login — email after value
-**Decision:** Capture email only after the audit is complete, not before.  
-**Tradeoff:** Lower lead quality (no pre-qualification) vs. higher conversion (users see value first).  
-**Why:** Cold visitors from HN/Twitter won't give email for a promise. They will after seeing $2,400/yr in savings.
+### 1. No login - email after value
+Capture email only after audit completion.
 
-### 2. Hardcoded pricing engine, no AI for math
-**Decision:** All savings calculations use verified, typed pricing data. AI is only used for the narrative summary.  
-**Tradeoff:** Manual maintenance of pricing data vs. defensible, auditable numbers.  
-**Why:** A CFO needs to trust the numbers. "The AI said so" is not a valid citation. Verified pricing URLs are.
+### 2. Hardcoded pricing engine
+AI used only for summaries, not calculations.
 
-### 3. LocalStorage for audit persistence, not server-side sessions
-**Decision:** Completed audits are stored in localStorage keyed by audit ID.  
-**Tradeoff:** Data lost on browser clear vs. zero auth complexity and instant UX.  
-**Why:** No-login product. Server-side sessions require auth. LocalStorage is sufficient for the "just completed" flow.
+### 3. LocalStorage persistence
+Fast no-login experience.
 
-### 4. Honeypot over CAPTCHA for bot protection
-**Decision:** Hidden honeypot field on lead capture form instead of reCAPTCHA.  
-**Tradeoff:** Less robust against sophisticated bots vs. zero UX friction for real users.  
-**Why:** reCAPTCHA adds 2-3 seconds of friction and accessibility issues. Honeypot catches 95%+ of automated form submissions with zero user impact. Rate limiting (3/hr per email) handles the rest.
+### 4. Honeypot protection
+Low-friction abuse protection.
 
-### 5. Edge runtime for OG image generation
-**Decision:** OG image API route uses Next.js Edge runtime with `ImageResponse`.  
-**Tradeoff:** Limited Node.js APIs vs. fast cold starts and global CDN distribution.  
-**Why:** OG images are fetched by social crawlers worldwide. Edge runtime ensures <100ms response globally without a warm Node.js instance.
+### 5. Edge/runtime optimized sharing
+Fast and scalable public sharing experience.
