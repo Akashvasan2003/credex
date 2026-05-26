@@ -1,4 +1,4 @@
-# SpendLens - AI Spend Audit Platform
+# SpendLens — AI Spend Audit Platform
 
 > Audit your AI tool spending in minutes. Get defensible recommendations and identify AI cost savings.
 
@@ -90,7 +90,7 @@ npm run test
 
 ## 5 Key Tradeoff Decisions
 
-### 1. No login - email after value
+### 1. No login — email after value
 Capture email only after audit completion.
 
 ### 2. Hardcoded pricing engine
